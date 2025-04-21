@@ -25,7 +25,7 @@ VOLUME /app/data
 
 # Script de démarrage conditionnel
 COPY start.sh .
-# RUN chmod +x start.sh
+RUN chmod +x start.sh
 
 # Exécuter le script approprié selon le mode
 CMD ["./start.sh"]
