@@ -1,0 +1,27 @@
+services:
+  domain-monitor:
+    build: .
+    container_name: domain-monitor
+    env_file: .env
+    environment:
+      - TEST_MODE=${TEST_MODE:-false}
+      - TEST_SERVICE=${TEST_SERVICE:-}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/data/domain_history.json') or os.environ.get('TEST_MODE') == 'true' else 1)"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
