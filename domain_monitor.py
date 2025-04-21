@@ -56,7 +56,128 @@ def get_config():
     return config
 
 
-# [Le reste du code pour check_domain_status, detect_changes, save_history, et load_history reste inchangé]
+def normalize_whois_value(value):
+    if value is None:
+        return None
+
+    # Traitement des listes
+    if isinstance(value, list):
+        # Tri des listes pour une comparaison cohérente
+        if all(isinstance(x, str) for x in value):
+            return sorted([str(x).lower() for x in value])
+        return value
+
+    # Traitement des dates
+    if hasattr(value, 'strftime'):
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Autres types
+    return str(value)
+
+# Fonction pour vérifier le statut du domaine
+def check_domain_status(domain):
+    try:
+        w = whois.whois(domain)
+
+        # Extraire les informations importantes
+        status = {}
+
+        # Vérifier si le domaine existe
+        if w.domain_name is None:
+            status['registered'] = False
+            status['availability'] = "Le domaine semble être disponible"
+        else:
+            status['registered'] = True
+
+            # Récupérer les informations importantes
+            important_fields = [
+                'domain_name', 'registrar', 'whois_server', 'status',
+                'name_servers', 'creation_date', 'expiration_date',
+                'updated_date', 'dnssec'
+            ]
+
+            for field in important_fields:
+                if hasattr(w, field):
+                    status[field] = normalize_whois_value(getattr(w, field))
+
+        status['raw_text'] = w.text if hasattr(w, 'text') else "Pas de texte brut disponible"
+        status['check_time'] = datetime.now().isoformat()
+
+        return status
+    except Exception as e:
+        logger.error(f"Erreur lors de la vérification du domaine {domain}: {e}")
+        return {
+            'error': str(e),
+            'check_time': datetime.now().isoformat()
+        }
+
+
+# Fonction pour comparer les statuts et détecter les changements
+def detect_changes(previous_status, current_status):
+    changes = {}
+
+    if 'error' in current_status:
+        return {"error": current_status['error']}
+
+    if not previous_status:
+        return {"message": "Premier contrôle, pas d'historique disponible"}
+
+    # Ignorer certains champs dans la comparaison
+    skip_fields = ['check_time', 'raw_text']
+
+    for key in current_status:
+        if key in skip_fields:
+            continue
+
+        if key not in previous_status:
+            changes[key] = {
+                'from': None,
+                'to': current_status[key]
+            }
+        elif previous_status[key] != current_status[key]:
+            changes[key] = {
+                'from': previous_status[key],
+                'to': current_status[key]
+            }
+
+    # Vérifier les champs disparus
+    for key in previous_status:
+        if key in skip_fields:
+            continue
+
+        if key not in current_status:
+            changes[key] = {
+                'from': previous_status[key],
+                'to': None
+            }
+
+    return changes
+
+# Fonction pour sauvegarder l'historique
+def save_history(config, status):
+    try:
+        # Créer le répertoire de données si nécessaire
+        os.makedirs(os.path.dirname(config['history_file']), exist_ok=True)
+
+        with open(config['history_file'], 'w') as f:
+            json.dump(status, f, indent=2)
+        logger.info(f"Historique sauvegardé dans {config['history_file']}")
+        return True
+    except Exception as e:
+        logger.error(f"Erreur lors de la sauvegarde de l'historique: {e}")
+        return False
+
+
+# Fonction pour charger l'historique
+def load_history(config):
+    try:
+        if os.path.exists(config['history_file']):
+            with open(config['history_file'], 'r') as f:
+                return json.load(f)
+        return None
+    except Exception as e:
+        logger.error(f"Erreur lors du chargement de l'historique: {e}")
+        return None
 
 # Fonction pour préparer le message de notification
 def prepare_notification_message(domain, changes, current_status):
