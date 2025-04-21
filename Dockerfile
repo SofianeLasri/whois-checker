@@ -17,15 +17,15 @@ RUN mkdir -p /app/data && chown -R appuser:appuser /app
 COPY domain_monitor.py notifications.py test_notifications.py ./
 RUN chmod +x test_notifications.py
 
+# Script de démarrage conditionnel
+COPY start.sh .
+RUN chmod +x start.sh
+
 # Définir l'utilisateur non-root
 USER appuser
 
 # Créer un volume pour la persistance des données
 VOLUME /app/data
-
-# Script de démarrage conditionnel
-COPY start.sh .
-RUN chmod +x start.sh
 
 # Exécuter le script approprié selon le mode
 CMD ["./start.sh"]
