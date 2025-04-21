@@ -2,7 +2,6 @@ services:
   domain-monitor:
     build: .
     container_name: domain-monitor
-    env_file: .env
     environment:
       - TEST_MODE=${TEST_MODE:-false}
       - TEST_SERVICE=${TEST_SERVICE:-}
